@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+
+# Modified from https://blog.ostermiller.org/route53-dynamic-dns
+# by Justin Lee to be a systemd service on 2019-07-02.
+
+set -e
+
+nap=1879 # don't touch
+
+# Signal trapping
+function catch
+{
+	echo "Caught exit signal (INT / TERM), finishing up then quiting."
+
+	# set the run flag to 0
+	run=0
+}
+
+trap catch SIGINT SIGTERM
+
+# Import stuff
+function config
+{
+	if [ -f "$config" ]; then
+		echo "Loading configuration."
+
+		source "$config"
+	else
+		echo "Failure: No configuration given." >&2
+		exit 1
+	fi
+}
+
+trap config SIGHUP
+
+# Load the config
+config
+
+# Check for required variables
+if [ -z "$hostname" ] || [ -z "$zoneid" ] || [ -z "$nameserver" ]; then
+	echo "Failure: Required variables not set, please check config!" >&2
+	exit 1
+fi
+
+# Set the run flag.
+run=1
+
+# Loop it up!
+while [ "$run" != 0 ]; do
+	# Get your external IP address using ifconfig.co
+	newip=$(curl ifconfig.co 2>/dev/null)
+	if [[ ! $newip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+		echo "Failure: Could not get my current IP address: $newip" >&2
+		exit 1
+	fi
+
+	# Get the IP address record that AWS currently has, using AWS's DNS server
+	oldip=$(dig +short "$hostname" @"$nameserver" 2>/dev/null | head -1)
+	if [[ ! $oldip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+		echo "Failure: Could not get old IP address for $hostname: $oldip" >&2
+		exit 1
+	fi
+
+	# Bail if everything is already up to date
+	if [ "$newip" == "$oldip" ]; then
+		echo "No update required for $hostname."
+	else
+		# aws route53 client requires the info written to a JSON file
+		tmp=$(mktemp /tmp/aws-ddns.XXXXXXXX)
+		cat > ${tmp} << EOF
+{
+    "Comment": "Auto updating @ $( date )",
+    "Changes": [{
+        "Action": "UPSERT",
+        "ResourceRecordSet": {
+            "ResourceRecords":[{ "Value": "$newip" }],
+            "Name": "$hostname",
+            "Type": "A",
+            "TTL": 60
+        }
+    }]
+}
+EOF
+
+		echo "IP update required for $hostname: $oldip -> $newip"
+		aws route53 change-resource-record-sets --hosted-zone-id $zoneid --change-batch "file://$tmp" >/dev/null 2>&1
+
+		# Drop the temporary file.
+		rm -f "$tmp" 2>/dev/null
+	fi
+
+	# Have a well deserved nap.
+	echo "Going for a nap..."
+	sleep $nap
+	echo "Back to work..."
+done
+
+exit 0
