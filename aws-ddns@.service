@@ -1,0 +1,15 @@
+[Unit]
+Description=AWS-DDNS [%I]
+Wants=network-online.target
+After=network.target network-online.target
+
+[Service]
+Environment=config=/etc/default/aws-ddns@%i
+ExecStart=/usr/local/sbin/aws-ddns
+RestartSec=60
+Restart=on-failure
+# exit status 1 is service failure, do not restart
+RestartPreventExitStatus=1
+
+[Install]
+WantedBy=multi-user.target
