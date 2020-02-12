@@ -38,7 +38,7 @@ MAHGURN=$(ls "$(dirname $0)/$SERVICE@"* | grep -v $DEFINITION)
 
 for f in $MAHGURN; do
 	if [ "$(basename $f)" = "$EXAMPLE" ]; then
-		warn "Skipping $EXAMPLE, please use this to make your file."
+		warn "Skipping $EXAMPLE, please use this to make your aws-ddns@<host> file."
 	else
 		log "Installing $f..."
 		install -m 0644 -t $DEFAULTS $f
