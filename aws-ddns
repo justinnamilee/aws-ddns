@@ -3,9 +3,8 @@
 # Modified from https://blog.ostermiller.org/route53-dynamic-dns
 # by Justin Lee to be a systemd service on 2019-07-02.
 
-set -e
-
 nap=1879 # don't touch
+shortnap=90
 
 # Signal trapping
 function catch
@@ -50,48 +49,63 @@ while [ "$run" != 0 ]; do
 	# Get your external IP address using ifconfig.co
 	newip=$(curl ifconfig.co 2>/dev/null)
 	if [[ ! $newip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-		echo "Failure: Could not get my current IP address: $newip" >&2
-		exit 1
+		echo "Failure: Could not get my current IP address: Main" >&2
+		newip=$(curl -s https://api.ipify.org 2>/dev/null)
+
+		if [[ ! $newip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+			echo "Failure: Could not get my current IP address: Secondary" >&2
+			echo "Going for a short nap..."
+			sleep $shortnap
+			unset newip
+		fi
 	fi
 
-	# Get the IP address record that AWS currently has, using AWS's DNS server
-	oldip=$(dig +short "$hostname" @"$nameserver" 2>/dev/null | head -1)
-	if [[ ! $oldip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-		echo "Failure: Could not get old IP address for $hostname: $oldip" >&2
-		exit 1
-	fi
+	if [ ! -z "$newip" ]; then
+		# Get the IP address record that AWS currently has, using AWS's DNS server
+		oldip=$(dig +short "$hostname" @"$nameserver" 2>/dev/null | head -1)
 
-	# Bail if everything is already up to date
-	if [ "$newip" == "$oldip" ]; then
-		echo "No update required for $hostname."
-	else
-		# aws route53 client requires the info written to a JSON file
-		tmp=$(mktemp /tmp/aws-ddns.XXXXXXXX)
-		cat > ${tmp} << EOF
+		if [[ ! $oldip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+			echo "Failure: Could not get old IP address for $hostname: $oldip" >&2
+
+			echo "Going for a short nap..."
+			sleep $shortnap
+		else
+			echo "Success: Got IP from lookup: $newip"
+
+			# Bail if everything is already up to date
+			if [ "$newip" == "$oldip" ]; then
+				echo "No update required for $hostname."
+			else
+				# aws route53 client requires the info written to a JSON file
+				tmp=$(mktemp /tmp/aws-ddns.XXXXXXXX)
+				cat > ${tmp} << EOF
 {
     "Comment": "Auto updating @ $( date )",
     "Changes": [{
-        "Action": "UPSERT",
-        "ResourceRecordSet": {
-            "ResourceRecords":[{ "Value": "$newip" }],
-            "Name": "$hostname",
-            "Type": "A",
-            "TTL": 60
-        }
+	"Action": "UPSERT",
+	"ResourceRecordSet": {
+	    "ResourceRecords":[{ "Value": "$newip" }],
+	    "Name": "$hostname",
+	    "Type": "A",
+	    "TTL": 60
+	}
     }]
 }
 EOF
 
-		echo "IP update required for $hostname: $oldip -> $newip"
-		aws route53 change-resource-record-sets --hosted-zone-id $zoneid --change-batch "file://$tmp" >/dev/null 2>&1
+				echo "IP update required for $hostname: $oldip -> $newip"
+				aws route53 change-resource-record-sets --hosted-zone-id $zoneid --change-batch "file://$tmp" >/dev/null 2>&1
 
-		# Drop the temporary file.
-		rm -f "$tmp" 2>/dev/null
+				# Drop the temporary file.
+				rm -f "$tmp" 2>/dev/null
+			fi
+
+			# Have a well deserved nap.
+			echo "Going for a nap..."
+			sleep $nap
+		fi
 	fi
 
-	# Have a well deserved nap.
-	echo "Going for a nap..."
-	sleep $nap
 	echo "Back to work..."
 done
 
