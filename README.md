@@ -8,6 +8,7 @@ A basic AWS DDNS client in bash for systemd.
 - Finally start the sevice with `systemctl start aws-ddns@example`.
 
 ## Additional Information
-- You will need to install `awscli`, for example `apt-get install awscli` (Ubuntu);
-- You will need `dig` installed, for example `apt-get install dnsutils` (Ubuntu);
+- You will need to install `awscli`, for example `apt-get install awscli` (Deb/Ubuntu);
+- You will need `dig` installed, for example `apt-get install dnsutils` (Deb/Ubuntu);
+- You will need `curl` installed, for example `apt-get install curl` (Deb/Ubuntu);
 - Finally, you will need to run `aws configure` as root to store your AWS credentials so it can modify your Route 53 entries.
