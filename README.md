@@ -16,7 +16,7 @@ A basic AWS DDNS client in bash for systemd.
 	- and a `sudo systemctl enable aws-ddns@ddns-home`, for example.
 
 ## Install.bash Script
-You can instead perform the install.bash, all you need to do is create a new `/etc/default` (like `aws-ddns@ddns-home`) file in this directory and then run `sudo bash install.bash`.
+You can instead perform the install.bash, all you need to do is create a new `/etc/default` (like `aws-ddns@ddns-home`) file in this directory and then run `sudo bash install.bash`.  It will take any files that match `aws-ddns@*` (except *aws-ddns@example*) and put them into the `/etc/default` folder automatically.  It will also install the service definition and bash script for you.  Neat.
 
 ## Additional Information
 - You will need to install `awscli`, for example `apt-get install awscli` (Deb/Ubuntu);
