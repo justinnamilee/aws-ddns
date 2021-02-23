@@ -46,4 +46,6 @@ for f in $MAHGURN; do
 	fi
 done
 
+echo "$0 finished successfully."
+
 exit 0
