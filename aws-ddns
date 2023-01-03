@@ -82,13 +82,13 @@ while [ "$run" != 0 ]; do
 {
     "Comment": "Auto updating @ $( date )",
     "Changes": [{
-	"Action": "UPSERT",
-	"ResourceRecordSet": {
-	    "ResourceRecords":[{ "Value": "$newip" }],
-	    "Name": "$hostname",
-	    "Type": "A",
-	    "TTL": 60
-	}
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+          "ResourceRecords":[{ "Value": "$newip" }],
+          "Name": "$hostname",
+          "Type": "A",
+          "TTL": 60
+      }
     }]
 }
 EOF
